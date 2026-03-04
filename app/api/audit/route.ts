@@ -179,7 +179,8 @@ export async function POST(req: NextRequest) {
                 usesWebP: (audits['uses-webp-images']?.displayValue as string) || 'N/A',
                 lazyLoading: (audits['offscreen-images']?.displayValue as string) || 'N/A',
                 textCompression: (audits['uses-text-compression']?.displayValue as string) || 'N/A',
-                https: (audits['is-on-https']?.score as number) === 1 ? 'Yes' : 'No',
+                // is-on-https: score=1 means pass, score=null also means pass (not applicable = already https), score=0 means fail
+                https: (audits['is-on-https']?.score as number) === 0 ? 'No' : 'Yes',
                 httpRedirect: (audits['redirects-http']?.score as number) === 1 ? 'Yes' : 'No',
                 opportunities: Object.entries(audits)
                     .filter(([, v]) => (v as Record<string, unknown>).details && (v as Record<string, unknown>).score !== null && ((v as Record<string, unknown>).score as number) < 0.9)
