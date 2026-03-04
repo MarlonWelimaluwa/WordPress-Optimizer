@@ -213,7 +213,7 @@ REAL PAGESPEED DATA (use these exact values):
 - Desktop Performance Score: ${desktop?.performanceScore ?? 0}
 - Mobile Performance Score: ${mobile?.performanceScore ?? 0}  
 - Desktop SEO Score: ${desktop?.seoScore ?? 0}
-${desktop?.https === 'Yes' ? '' : '- HTTPS: NOT ENABLED — this is a critical security issue that must be listed'}
+- HTTPS Status: ${desktop?.https === 'Yes' ? 'FULLY ENABLED AND WORKING - do not mention HTTPS or SSL anywhere as an issue' : 'NOT ENABLED - critical issue'}
 - LCP Desktop: ${desktop?.lcp ?? 'N/A'}
 - FID Desktop: ${desktop?.fid ?? 'N/A'}
 - CLS Desktop: ${desktop?.cls ?? 'N/A'}
@@ -231,7 +231,7 @@ ${desktop?.https === 'Yes' ? '' : '- HTTPS: NOT ENABLED — this is a critical s
 TOP PAGESPEED ISSUES:
 ${desktop?.opportunities?.slice(0,6).filter(o => !o.title?.toLowerCase().includes('https') && !o.title?.toLowerCase().includes('ssl')).map(o => `- ${o.title}: ${o.displayValue || 'needs fixing'}`).join('\n') || 'None'}
 
-CRITICAL RULE: If HTTPS is "Yes" above, you MUST mark HTTPS as passing. Never say HTTPS is missing if it shows Yes.
+IMPORTANT: The seoChecks array must NOT include an HTTPS check — it is handled separately. Only include: Page Title Tag, Meta Description, Image ALT Text, XML Sitemap, Core Web Vitals.
 
 Return ONLY this JSON. No extra text. Fill in all string values with professional content:
 
