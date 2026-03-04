@@ -49,11 +49,7 @@ PLUGIN RECOMMENDATIONS BY ISSUE:
 
 Be specific, accurate, and professional. Give exact plugin names, exact settings to change, and measurable impact of each fix.
 
-ABSOLUTE RULES — NEVER BREAK THESE:
-1. If HTTPS Enabled = Yes in the data → NEVER mention HTTPS as an issue anywhere in your response
-2. If HTTPS Enabled = Yes → NEVER add SSL certificate installation to any section
-3. If HTTPS Enabled = Yes → NEVER mention "HTTP only", "not secure", "missing SSL" anywhere
-4. Only report issues that are ACTUALLY present in the PageSpeed data provided
+IMPORTANT: Do NOT include any HTTPS or SSL checks in your response. Security checks are handled by a separate backend system. Never mention HTTPS, SSL certificates, or HTTP/HTTPS in your issues, warnings, summary, topFixes, or nextActions.
 
 OUTPUT: ONLY valid JSON. No markdown. No explanation. No text before or after.`;
 
@@ -213,7 +209,7 @@ REAL PAGESPEED DATA (use these exact values):
 - Desktop Performance Score: ${desktop?.performanceScore ?? 0}
 - Mobile Performance Score: ${mobile?.performanceScore ?? 0}  
 - Desktop SEO Score: ${desktop?.seoScore ?? 0}
-- HTTPS Status: ${desktop?.https === 'Yes' ? 'FULLY ENABLED AND WORKING - do not mention HTTPS or SSL anywhere as an issue' : 'NOT ENABLED - critical issue'}
+- Security: Handled separately by backend system
 - LCP Desktop: ${desktop?.lcp ?? 'N/A'}
 - FID Desktop: ${desktop?.fid ?? 'N/A'}
 - CLS Desktop: ${desktop?.cls ?? 'N/A'}
@@ -245,74 +241,81 @@ Return ONLY this JSON. No extra text. Fill in all string values with professiona
 
         const parsed = JSON.parse(raw);
 
-        // ── HARD OVERRIDE — real PageSpeed data always wins over AI guesses ──
+        // ── HARD OVERRIDE — real PageSpeed data always wins ──
         const httpsStatus = desktop?.https === 'Yes';
+
+        // Helper — does this text mention HTTPS/SSL as an issue?
+        const hasHttpsIssue = (t: string) => {
+            const s = (t || '').toLowerCase();
+            return s.includes('https') || s.includes('ssl') || s.includes('not secure') || s.includes('certificate') || s.includes('http only') || s.includes('insecure');
+        };
+
+        // If HTTPS is missing — inject it as a critical issue
+        if (!httpsStatus) {
+            if (Array.isArray(parsed.issues?.critical)) {
+                const alreadyHasIt = parsed.issues.critical.some((i: {title:string}) => hasHttpsIssue(i.title));
+                if (!alreadyHasIt) {
+                    parsed.issues.critical.unshift({
+                        title: 'HTTPS Not Enabled',
+                        description: 'Your site is loading over HTTP which is unencrypted and insecure',
+                        impact: 'Google Chrome shows Not Secure warning — kills visitor trust. Google penalizes HTTP sites in rankings.',
+                        fix: "Install a free SSL certificate via your hosting control panel. Look for SSL/TLS or Let's Encrypt in cPanel. Takes 5 minutes.",
+                        plugin: 'Cloudflare free tier also provides SSL automatically',
+                    });
+                }
+            }
+        }
+
+        if (httpsStatus) {
+            // 1. Remove from critical issues
+            if (Array.isArray(parsed.issues?.critical)) {
+                parsed.issues.critical = parsed.issues.critical.filter((i: {title:string}) => !hasHttpsIssue(i.title));
+            }
+            // 2. Remove from warnings
+            if (Array.isArray(parsed.issues?.warnings)) {
+                parsed.issues.warnings = parsed.issues.warnings.filter((i: {title:string}) => !hasHttpsIssue(i.title));
+            }
+            // 3. Remove from topFixes
+            if (Array.isArray(parsed.topFixes)) {
+                parsed.topFixes = parsed.topFixes.filter((f: string) => !hasHttpsIssue(f));
+            }
+            // 4. Remove from all nextActions
+            ['immediate','shortTerm','longTerm'].forEach(key => {
+                if (Array.isArray(parsed.nextActions?.[key])) {
+                    parsed.nextActions[key] = parsed.nextActions[key].filter((a: string) => !hasHttpsIssue(a));
+                }
+            });
+            // 5. Rewrite summary — replace ALL sentences mentioning HTTPS/SSL issue
+            if (parsed.summary) {
+                // Split into sentences, filter out HTTPS issue sentences, rejoin
+                const sentences = parsed.summary.split(/(?<=[.!?])\s+/);
+                const cleaned = sentences.filter((s: string) => !hasHttpsIssue(s));
+                parsed.summary = cleaned.join(' ').trim();
+                // If summary became too short, add a positive note
+                if (parsed.summary.length < 50) {
+                    parsed.summary = `This site demonstrates solid performance with HTTPS security properly configured. Focus on the performance improvements below to boost rankings and conversions.`;
+                }
+            }
+            // 6. Fix wordpressSpecific
+            if (parsed.wordpressSpecific) {
+                parsed.wordpressSpecific.httpsEnabled = 'Yes — HTTPS active and SSL certificate working correctly';
+            }
+        }
+
+        // 7. Always inject correct HTTPS into seoChecks — regardless of httpsStatus
         const httpsCheckObj = {
             title: 'HTTPS Security',
             status: httpsStatus ? 'pass' : 'fail',
             current: httpsStatus ? 'HTTPS enabled — SSL certificate active' : 'HTTP only — not secure',
             issue: httpsStatus ? 'None — HTTPS is properly configured' : 'Site is not using HTTPS — Google penalizes HTTP sites',
-            fix: httpsStatus ? 'No action needed — SSL certificate is active and working' : 'Install free SSL certificate via your hosting control panel (Let\'s Encrypt)',
+            fix: httpsStatus ? 'No action needed — SSL is active and working' : "Install free SSL via your hosting control panel — Let's Encrypt is free",
         };
-
-        // Always inject correct HTTPS check into seoChecks
         if (Array.isArray(parsed.seoChecks)) {
-            const existingIdx = parsed.seoChecks.findIndex((c: { title: string }) => c.title?.toLowerCase().includes('https'));
-            if (existingIdx >= 0) {
-                parsed.seoChecks[existingIdx] = httpsCheckObj;
+            const idx = parsed.seoChecks.findIndex((c: {title:string}) => hasHttpsIssue(c.title));
+            if (idx >= 0) {
+                parsed.seoChecks[idx] = httpsCheckObj;
             } else {
                 parsed.seoChecks.unshift(httpsCheckObj);
-            }
-        }
-
-        if (httpsStatus) {
-            // Fix SEO checks — already handled above
-            // Fix wordpressSpecific
-            if (parsed.wordpressSpecific) {
-                parsed.wordpressSpecific.httpsEnabled = 'Yes — HTTPS active and SSL certificate working correctly';
-            }
-            // Remove ALL HTTPS/SSL related issues from critical and warnings
-            const isHttpsIssue = (title: string) => {
-                const t = title?.toLowerCase() || '';
-                return t.includes('https') || t.includes('ssl') || t.includes('http only') || t.includes('certificate') || t.includes('not secure') || t.includes('insecure');
-            };
-            if (Array.isArray(parsed.issues?.critical)) {
-                parsed.issues.critical = parsed.issues.critical.filter(
-                    (i: { title: string }) => !isHttpsIssue(i.title)
-                );
-            }
-            if (Array.isArray(parsed.issues?.warnings)) {
-                parsed.issues.warnings = parsed.issues.warnings.filter(
-                    (i: { title: string }) => !isHttpsIssue(i.title)
-                );
-            }
-            // Fix topFixes array
-            if (Array.isArray(parsed.topFixes)) {
-                parsed.topFixes = parsed.topFixes.filter(
-                    (f: string) => !f?.toLowerCase().includes('https') && !f?.toLowerCase().includes('ssl') && !f?.toLowerCase().includes('certificate')
-                );
-            }
-            // Fix nextActions
-            if (parsed.nextActions?.immediate) {
-                parsed.nextActions.immediate = parsed.nextActions.immediate.filter(
-                    (a: string) => !a?.toLowerCase().includes('https') && !a?.toLowerCase().includes('ssl') && !a?.toLowerCase().includes('certificate')
-                );
-            }
-            // Fix summary text
-            if (parsed.summary) {
-                parsed.summary = parsed.summary
-                    .replace(/implementing https(?: is| are)? (?:a )?critical/gi, 'maintaining HTTPS is already done')
-                    .replace(/not utilizing https/gi, 'utilizing HTTPS correctly')
-                    .replace(/not using https/gi, 'using HTTPS correctly')
-                    .replace(/lacks? https/gi, 'has HTTPS enabled')
-                    .replace(/no https/gi, 'HTTPS enabled')
-                    .replace(/without https/gi, 'with HTTPS enabled')
-                    .replace(/http only/gi, 'HTTPS active')
-                    .replace(/missing (?:an? )?ssl/gi, 'has SSL active')
-                    .replace(/no ssl/gi, 'SSL active')
-                    .replace(/install(?:ing)? (?:an? )?ssl/gi, 'SSL is already installed')
-                    .replace(/requires? (?:an? )?ssl/gi, 'SSL is active')
-                    .replace(/implement(?:ing)? https/gi, 'HTTPS already active');
             }
         }
 
