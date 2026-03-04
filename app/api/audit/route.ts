@@ -51,40 +51,49 @@ Be specific, accurate, and professional. Give exact plugin names, exact settings
 OUTPUT: ONLY valid JSON. No markdown. No explanation. No text before or after.`;
 
 function extractJSON(text: string): string {
-    // Remove markdown code blocks
-    let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
-    const start = cleaned.indexOf('{');
-    const end = cleaned.lastIndexOf('}');
-    if (start === -1 || end === -1 || end <= start) throw new Error('No valid JSON found in response');
-    cleaned = cleaned.slice(start, end + 1);
+    // Step 1: Clean markdown
+    let s = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
 
-    // Fix common JSON issues from AI output
-    cleaned = cleaned
-        .replace(/,\s*}/g, '}')          // trailing comma in object
-        .replace(/,\s*]/g, ']')          // trailing comma in array
-        .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":')  // unquoted keys
-        .replace(/:\s*'([^']*)'/g, ': "$1"')  // single quotes to double quotes
-        .replace(/[\x00-\x1F\x7F]/g, ' '); // remove control characters
+    // Step 2: Find JSON boundaries
+    const start = s.indexOf('{');
+    const end = s.lastIndexOf('}');
+    if (start === -1 || end === -1) throw new Error('No JSON found');
+    s = s.slice(start, end + 1);
 
-    // Validate — try parse, if fails try to salvage
+    // Step 3: Fix trailing commas (most common Gemini issue)
+    // Remove trailing comma before } or ]
+    s = s.replace(/,\s*([}\]])/g, '$1');
+
+    // Step 4: Remove control characters
+    s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+    // Step 5: Try to parse
     try {
-        JSON.parse(cleaned);
-        return cleaned;
-    } catch {
-        // Last resort — find last valid closing brace
-        let lastValid = cleaned;
-        for (let i = cleaned.length - 1; i > 0; i--) {
-            if (cleaned[i] === '}') {
-                try {
-                    JSON.parse(cleaned.slice(0, i + 1));
-                    lastValid = cleaned.slice(0, i + 1);
-                    break;
-                } catch { continue; }
+        JSON.parse(s);
+        return s;
+    } catch(e) {
+        // Step 6: Try again with more aggressive fixes
+        s = s
+            .replace(/,\s*,/g, ',')           // double commas
+            .replace(/\[\s*,/g, '[')           // leading comma in array
+            .replace(/,\s*([}\]])/g, '$1');    // trailing commas again
+
+        try {
+            JSON.parse(s);
+            return s;
+        } catch {
+            // Step 7: Last resort - find last valid position
+            for (let i = s.length - 1; i > 0; i--) {
+                if (s[i] === '}') {
+                    const candidate = s.slice(0, i + 1).replace(/,\s*([}\]])/g, '$1');
+                    try { JSON.parse(candidate); return candidate; } catch { continue; }
+                }
             }
+            throw new Error('Could not parse JSON from AI response');
         }
-        return lastValid;
     }
 }
+
 
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY || ''}`, {
