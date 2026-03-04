@@ -60,20 +60,20 @@ OUTPUT: ONLY valid JSON. No markdown. No explanation. No text before or after.`;
 function extractJSON(text: string): string {
     // Step 1: Clean markdown
     let s = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
-
+    
     // Step 2: Find JSON boundaries
     const start = s.indexOf('{');
     const end = s.lastIndexOf('}');
     if (start === -1 || end === -1) throw new Error('No JSON found');
     s = s.slice(start, end + 1);
-
+    
     // Step 3: Fix trailing commas (most common Gemini issue)
     // Remove trailing comma before } or ]
     s = s.replace(/,\s*([}\]])/g, '$1');
-
+    
     // Step 4: Remove control characters
     s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-
+    
     // Step 5: Try to parse
     try {
         JSON.parse(s);
@@ -84,7 +84,7 @@ function extractJSON(text: string): string {
             .replace(/,\s*,/g, ',')           // double commas
             .replace(/\[\s*,/g, '[')           // leading comma in array
             .replace(/,\s*([}\]])/g, '$1');    // trailing commas again
-
+        
         try {
             JSON.parse(s);
             return s;
@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
 
         // Build clean prompt — NO JSON template inside prompt (causes Gemini confusion)
         const auditDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
+        
         const userPrompt = `You are auditing this WordPress site. Generate a professional audit report as JSON.
 
 SITE URL: ${url}
@@ -213,7 +213,7 @@ REAL PAGESPEED DATA (use these exact values):
 - Desktop Performance Score: ${desktop?.performanceScore ?? 0}
 - Mobile Performance Score: ${mobile?.performanceScore ?? 0}  
 - Desktop SEO Score: ${desktop?.seoScore ?? 0}
-- HTTPS Enabled: ${desktop?.https ?? 'No'}
+${desktop?.https === 'Yes' ? '- HTTPS: Properly configured and active. DO NOT mention HTTPS as an issue.' : '- HTTPS Enabled: No — this is a critical issue'}
 - LCP Desktop: ${desktop?.lcp ?? 'N/A'}
 - FID Desktop: ${desktop?.fid ?? 'N/A'}
 - CLS Desktop: ${desktop?.cls ?? 'N/A'}
@@ -237,12 +237,12 @@ Return ONLY this JSON. No extra text. Fill in all string values with professiona
 
 {"url":"${url}","auditDate":"${auditDate}","overallScore":0,"performanceScore":${desktop?.performanceScore ?? 0},"seoScore":${desktop?.seoScore ?? 0},"mobileScore":${mobile?.performanceScore ?? 0},"securityScore":75,"grade":"B","summary":"FILL: 3 sentences about this site performance based on real scores above","coreWebVitals":{"lcp":{"value":"${desktop?.lcp ?? 'N/A'}","status":"FILL: good or needs-improvement or poor","description":"FILL: what this LCP means for this site","fix":"FILL: specific fix"},"fid":{"value":"${desktop?.fid ?? 'N/A'}","status":"FILL: good or needs-improvement or poor","description":"FILL: what FID means","fix":"FILL: specific fix"},"cls":{"value":"${desktop?.cls ?? 'N/A'}","status":"FILL: good or needs-improvement or poor","description":"FILL: what CLS means","fix":"FILL: specific fix"},"ttfb":{"value":"${desktop?.ttfb ?? 'N/A'}","status":"FILL: good or needs-improvement or poor","description":"FILL: what TTFB means","fix":"FILL: specific fix"},"fcp":{"value":"${desktop?.fcp ?? 'N/A'}","status":"FILL: good or needs-improvement or poor","description":"FILL: what FCP means","fix":"FILL: specific fix"}},"speedMetrics":{"desktop":${desktop?.performanceScore ?? 0},"mobile":${mobile?.performanceScore ?? 0},"loadTime":"FILL: estimated load time","pageSize":"${desktop?.totalByteWeight ?? 'N/A'}","requests":45},"issues":{"critical":[{"title":"FILL: critical issue title","description":"FILL: description","impact":"FILL: impact","fix":"FILL: exact fix","plugin":"FILL: plugin name or none"}],"warnings":[{"title":"FILL: warning title","description":"FILL: description","impact":"FILL: impact","fix":"FILL: exact fix","plugin":"FILL: plugin name or none"}],"passed":[{"title":"FILL: passing check","description":"FILL: why it is good"}]},"seoChecks":[{"title":"Page Title Tag","status":"FILL: pass or warn or fail","current":"FILL: status","issue":"FILL: issue or none","fix":"FILL: fix or no action needed"},{"title":"Meta Description","status":"FILL: pass or warn or fail","current":"FILL: status","issue":"FILL: issue","fix":"FILL: fix"},{"title":"Image ALT Text","status":"FILL: pass or warn or fail","current":"FILL: status","issue":"FILL: issue","fix":"FILL: fix"},{"title":"XML Sitemap","status":"FILL: pass or warn or fail","current":"FILL: status","issue":"FILL: issue","fix":"FILL: fix"},{"title":"Core Web Vitals","status":"${(desktop?.performanceScore ?? 0) >= 90 ? 'pass' : (desktop?.performanceScore ?? 0) >= 50 ? 'warn' : 'fail'}","current":"Performance score: ${desktop?.performanceScore ?? 0}/100","issue":"FILL: issue or none","fix":"FILL: fix or no action needed"}],"wordpressSpecific":{"phpVersion":"Cannot detect externally - check WordPress Admin > Tools > Site Health. Recommend PHP 8.2+","wordpressVersion":"Cannot detect externally - check WordPress Admin > Dashboard > Updates","caching":"FILL: assessment based on TTFB value","imageOptimization":"FILL: assessment based on image data","cdnDetected":"Cannot detect externally - Cloudflare CDN recommended","gzipEnabled":"${desktop?.textCompression !== 'N/A' ? 'Issues detected - ' + (desktop?.textCompression ?? '') : 'Status unknown - verify via hosting'}","httpsEnabled":"${desktop?.https === 'Yes' ? 'Yes - HTTPS active and SSL certificate working correctly' : 'No - install SSL certificate immediately'}","pluginBloat":"FILL: assessment based on performance","recommendations":[{"priority":"high","action":"FILL: top action","plugin":"FILL: plugin name","impact":"FILL: impact"},{"priority":"high","action":"FILL: second action","plugin":"FILL: plugin name","impact":"FILL: impact"},{"priority":"medium","action":"FILL: third action","plugin":"FILL: plugin name","impact":"FILL: impact"},{"priority":"medium","action":"FILL: fourth action","plugin":"FILL: plugin name","impact":"FILL: impact"},{"priority":"low","action":"FILL: fifth action","plugin":"FILL: plugin name","impact":"FILL: impact"}]},"topFixes":["FILL: fix 1","FILL: fix 2","FILL: fix 3","FILL: fix 4","FILL: fix 5"],"nextActions":{"immediate":["FILL: action 1","FILL: action 2","FILL: action 3"],"shortTerm":["FILL: action 1","FILL: action 2","FILL: action 3"],"longTerm":["FILL: action 1","FILL: action 2","FILL: action 3"]}}`;
         const raw = await callOpenAI(SYSTEM_PROMPT, userPrompt);
-
+        
         // Log raw response for debugging
         console.log('=== GEMINI RAW RESPONSE ===');
         console.log(raw.substring(0, 500));
         console.log('=== END ===');
-
+        
         const parsed = JSON.parse(raw);
 
         // ── HARD OVERRIDE — real PageSpeed data always wins over AI guesses ──
