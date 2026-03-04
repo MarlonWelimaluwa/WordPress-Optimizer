@@ -48,6 +48,13 @@ PLUGIN RECOMMENDATIONS BY ISSUE:
 - Minification: Autoptimize (free), if not using WP Rocket
 
 Be specific, accurate, and professional. Give exact plugin names, exact settings to change, and measurable impact of each fix.
+
+ABSOLUTE RULES — NEVER BREAK THESE:
+1. If HTTPS Enabled = Yes in the data → NEVER mention HTTPS as an issue anywhere in your response
+2. If HTTPS Enabled = Yes → NEVER add SSL certificate installation to any section
+3. If HTTPS Enabled = Yes → NEVER mention "HTTP only", "not secure", "missing SSL" anywhere
+4. Only report issues that are ACTUALLY present in the PageSpeed data provided
+
 OUTPUT: ONLY valid JSON. No markdown. No explanation. No text before or after.`;
 
 function extractJSON(text: string): string {
@@ -264,21 +271,37 @@ Return ONLY this JSON. No extra text. Fill in all string values with professiona
             if (parsed.wordpressSpecific) {
                 parsed.wordpressSpecific.httpsEnabled = 'Yes — HTTPS active and SSL certificate working correctly';
             }
-            // Remove HTTPS from critical issues
+            // Remove ALL HTTPS/SSL related issues from critical and warnings
+            const isHttpsIssue = (title: string) => {
+                const t = title?.toLowerCase() || '';
+                return t.includes('https') || t.includes('ssl') || t.includes('http only') || t.includes('certificate') || t.includes('not secure') || t.includes('insecure');
+            };
             if (Array.isArray(parsed.issues?.critical)) {
                 parsed.issues.critical = parsed.issues.critical.filter(
-                    (i: { title: string }) => !i.title?.toLowerCase().includes('https') && !i.title?.toLowerCase().includes('ssl')
+                    (i: { title: string }) => !isHttpsIssue(i.title)
                 );
             }
-            // Remove HTTPS from warnings
             if (Array.isArray(parsed.issues?.warnings)) {
                 parsed.issues.warnings = parsed.issues.warnings.filter(
-                    (i: { title: string }) => !i.title?.toLowerCase().includes('https') && !i.title?.toLowerCase().includes('ssl')
+                    (i: { title: string }) => !isHttpsIssue(i.title)
                 );
             }
-            // Fix summary text that wrongly mentions no HTTPS
+            // Fix topFixes array
+            if (Array.isArray(parsed.topFixes)) {
+                parsed.topFixes = parsed.topFixes.filter(
+                    (f: string) => !f?.toLowerCase().includes('https') && !f?.toLowerCase().includes('ssl') && !f?.toLowerCase().includes('certificate')
+                );
+            }
+            // Fix nextActions
+            if (parsed.nextActions?.immediate) {
+                parsed.nextActions.immediate = parsed.nextActions.immediate.filter(
+                    (a: string) => !a?.toLowerCase().includes('https') && !a?.toLowerCase().includes('ssl') && !a?.toLowerCase().includes('certificate')
+                );
+            }
+            // Fix summary text
             if (parsed.summary) {
                 parsed.summary = parsed.summary
+                    .replace(/implementing https(?: is| are)? (?:a )?critical/gi, 'maintaining HTTPS is already done')
                     .replace(/not utilizing https/gi, 'utilizing HTTPS correctly')
                     .replace(/not using https/gi, 'using HTTPS correctly')
                     .replace(/lacks? https/gi, 'has HTTPS enabled')
@@ -288,7 +311,8 @@ Return ONLY this JSON. No extra text. Fill in all string values with professiona
                     .replace(/missing (?:an? )?ssl/gi, 'has SSL active')
                     .replace(/no ssl/gi, 'SSL active')
                     .replace(/install(?:ing)? (?:an? )?ssl/gi, 'SSL is already installed')
-                    .replace(/requires? (?:an? )?ssl/gi, 'SSL is active');
+                    .replace(/requires? (?:an? )?ssl/gi, 'SSL is active')
+                    .replace(/implement(?:ing)? https/gi, 'HTTPS already active');
             }
         }
 
