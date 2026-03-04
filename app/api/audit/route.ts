@@ -104,7 +104,7 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<str
             contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
             generationConfig: {
                 temperature: 0.2,
-                maxOutputTokens: 4000,
+                maxOutputTokens: 8192,
                 responseMimeType: 'application/json',
             },
         }),
