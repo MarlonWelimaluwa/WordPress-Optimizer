@@ -59,14 +59,14 @@ function extractJSON(text: string): string {
 }
 
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY || ''}`,
+            'Authorization': `Bearer ${process.env.GROQ_API_KEY || ''}`,
         },
         body: JSON.stringify({
-            model: 'gpt-4o-mini',
+            model: 'llama-3.3-70b-versatile',
             max_tokens: 4000,
             temperature: 0.3,
             response_format: { type: 'json_object' },
@@ -77,7 +77,7 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<str
         }),
     });
     const d = await res.json();
-    if (d.error) throw new Error(`OpenAI error: ${d.error.message}`);
+    if (d.error) throw new Error(`Groq error: ${d.error.message}`);
     const raw = d.choices?.[0]?.message?.content || '';
     if (!raw) throw new Error('Empty response from AI');
     return extractJSON(raw);
