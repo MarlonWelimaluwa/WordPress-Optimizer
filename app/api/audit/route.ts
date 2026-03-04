@@ -189,243 +189,41 @@ export async function POST(req: NextRequest) {
         const desktop = Object.keys(desktopData).length > 0 ? extractMetrics(desktopData) : null;
         const mobile = Object.keys(mobileData).length > 0 ? extractMetrics(mobileData) : null;
 
-        // Build analysis prompt with real data
-        const userPrompt = `Analyze this WordPress site and generate a complete professional audit report.
+        // Build clean prompt — NO JSON template inside prompt (causes Gemini confusion)
+        const auditDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-URL: ${url}
-Audit Date: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        const userPrompt = `You are auditing this WordPress site. Generate a professional audit report as JSON.
 
-${pageSpeedError ? `NOTE: PageSpeed API error: ${pageSpeedError}. Generate a thorough audit based on WordPress best practices and common issues.` : ''}
+SITE URL: ${url}
+AUDIT DATE: ${auditDate}
 
-REAL PAGESPEED DATA:
-Desktop Performance Score: ${desktop?.performanceScore ?? 'unavailable'}
-Mobile Performance Score: ${mobile?.performanceScore ?? 'unavailable'}
-Desktop SEO Score: ${desktop?.seoScore ?? 'unavailable'}
-Mobile SEO Score: ${mobile?.seoScore ?? 'unavailable'}
+REAL PAGESPEED DATA (use these exact values):
+- Desktop Performance Score: ${desktop?.performanceScore ?? 0}
+- Mobile Performance Score: ${mobile?.performanceScore ?? 0}  
+- Desktop SEO Score: ${desktop?.seoScore ?? 0}
+- HTTPS Enabled: ${desktop?.https ?? 'No'}
+- LCP Desktop: ${desktop?.lcp ?? 'N/A'}
+- FID Desktop: ${desktop?.fid ?? 'N/A'}
+- CLS Desktop: ${desktop?.cls ?? 'N/A'}
+- TTFB Desktop: ${desktop?.ttfb ?? 'N/A'}
+- FCP Desktop: ${desktop?.fcp ?? 'N/A'}
+- LCP Mobile: ${mobile?.lcp ?? 'N/A'}
+- Page Size: ${desktop?.totalByteWeight ?? 'N/A'}
+- Unused JS: ${desktop?.unusedJS ?? 'N/A'}
+- Unused CSS: ${desktop?.unusedCSS ?? 'N/A'}
+- Render Blocking: ${desktop?.renderBlocking ?? 'N/A'}
+- Image Issues: ${desktop?.imageOptimization ?? 'N/A'}
+- WebP Issues: ${desktop?.usesWebP ?? 'N/A'}
+- GZIP: ${desktop?.textCompression ?? 'N/A'}
 
-CORE WEB VITALS (Desktop):
-- LCP: ${desktop?.lcp ?? 'unavailable'}
-- FID/INP: ${desktop?.fid ?? 'unavailable'}
-- CLS: ${desktop?.cls ?? 'unavailable'}
-- TTFB: ${desktop?.ttfb ?? 'unavailable'}
-- FCP: ${desktop?.fcp ?? 'unavailable'}
+TOP PAGESPEED ISSUES:
+${desktop?.opportunities?.slice(0,6).map(o => `- ${o.title}: ${o.displayValue || 'needs fixing'}`).join('\n') || 'None'}
 
-CORE WEB VITALS (Mobile):
-- LCP: ${mobile?.lcp ?? 'unavailable'}
-- CLS: ${mobile?.cls ?? 'unavailable'}
-- FCP: ${mobile?.fcp ?? 'unavailable'}
+CRITICAL RULE: If HTTPS is "Yes" above, you MUST mark HTTPS as passing. Never say HTTPS is missing if it shows Yes.
 
-PAGE METRICS:
-- Page Size: ${desktop?.totalByteWeight ?? 'unavailable'}
-- DOM Size: ${desktop?.domSize ?? 'unavailable'}
-- Render Blocking: ${desktop?.renderBlocking ?? 'unavailable'}
-- Unused JS: ${desktop?.unusedJS ?? 'unavailable'}
-- Unused CSS: ${desktop?.unusedCSS ?? 'unavailable'}
-- Image Optimization: ${desktop?.imageOptimization ?? 'unavailable'}
-- WebP Images: ${desktop?.usesWebP ?? 'unavailable'}
-- Lazy Loading: ${desktop?.lazyLoading ?? 'unavailable'}
-- Text Compression/GZIP: ${desktop?.textCompression ?? 'unavailable'}
-- HTTPS: ${desktop?.https ?? 'unavailable'}
+Return ONLY this JSON. No extra text. Fill in all string values with professional content:
 
-TOP OPPORTUNITIES IDENTIFIED BY PAGESPEED:
-${desktop?.opportunities?.map(o => `- ${o.title}: ${o.displayValue || ''} (Score: ${o.score})`).join('\n') || 'None available'}
-
-Based on this REAL data, generate a comprehensive WordPress audit report. Use the actual scores and metrics. If data shows issues, diagnose them accurately. Be specific about what the numbers mean.
-
-Return this EXACT JSON structure:
-{
-  "url": "${url}",
-  "auditDate": "${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}",
-  "overallScore": 65,
-  "performanceScore": ${desktop?.performanceScore ?? 50},
-  "seoScore": ${desktop?.seoScore ?? 50},
-  "mobileScore": ${mobile?.performanceScore ?? 45},
-  "securityScore": 70,
-  "grade": "C",
-  "summary": "3-4 sentence honest executive summary of what this site's performance means for the business — mention specific scores, what is causing the main issues, and the business impact (lost rankings, lost conversions)",
-  "coreWebVitals": {
-    "lcp": {
-      "value": "${desktop?.lcp ?? 'N/A'}",
-      "status": "poor",
-      "description": "LCP measures how long it takes for the largest content element to load. This directly affects user experience and Google ranking.",
-      "fix": "specific actionable fix based on the actual LCP value detected"
-    },
-    "fid": {
-      "value": "${desktop?.fid ?? 'N/A'}",
-      "status": "good",
-      "description": "FID/INP measures how quickly the page responds to user interactions like clicks and taps.",
-      "fix": "specific fix or confirmation it is good"
-    },
-    "cls": {
-      "value": "${desktop?.cls ?? 'N/A'}",
-      "status": "needs-improvement",
-      "description": "CLS measures visual stability — how much the page layout shifts unexpectedly as it loads.",
-      "fix": "specific fix based on actual CLS value"
-    },
-    "ttfb": {
-      "value": "${desktop?.ttfb ?? 'N/A'}",
-      "status": "needs-improvement",
-      "description": "TTFB measures how fast the server responds. A high TTFB usually means slow hosting or no caching.",
-      "fix": "specific fix based on actual TTFB value"
-    },
-    "fcp": {
-      "value": "${desktop?.fcp ?? 'N/A'}",
-      "status": "needs-improvement",
-      "description": "FCP measures how long until the first content appears on screen. Users perceive this as the page starting to load.",
-      "fix": "specific fix based on actual FCP value"
-    }
-  },
-  "speedMetrics": {
-    "desktop": ${desktop?.performanceScore ?? 50},
-    "mobile": ${mobile?.performanceScore ?? 40},
-    "loadTime": "estimated based on available metrics",
-    "pageSize": "${desktop?.totalByteWeight ?? 'N/A'}",
-    "requests": 45
-  },
-  "issues": {
-    "critical": [
-      {
-        "title": "specific critical issue found from the real data",
-        "description": "what is causing this and why it is serious",
-        "impact": "specific measurable impact on rankings/conversions/revenue",
-        "fix": "exact step-by-step fix",
-        "plugin": "specific plugin name if applicable"
-      }
-    ],
-    "warnings": [
-      {
-        "title": "specific warning from the real data",
-        "description": "what is causing this",
-        "impact": "impact on performance or SEO",
-        "fix": "exact fix with specific settings",
-        "plugin": "specific plugin name if applicable"
-      }
-    ],
-    "passed": [
-      {
-        "title": "what is working well",
-        "description": "why this is good for performance or SEO"
-      }
-    ]
-  },
-  "seoChecks": [
-    {
-      "title": "Page Title Tag",
-      "status": "pass",
-      "current": "detected or estimated status",
-      "issue": "specific issue if any",
-      "fix": "specific fix"
-    },
-    {
-      "title": "Meta Description",
-      "status": "warn",
-      "current": "detected or estimated status",
-      "issue": "specific issue",
-      "fix": "specific fix"
-    },
-    {
-      "title": "HTTPS Security",
-      "status": "${desktop?.https === 'Yes' ? 'pass' : 'fail'}",
-      "current": "${desktop?.https === 'Yes' ? 'HTTPS enabled' : 'HTTP only - not secure'}",
-      "issue": "${desktop?.https === 'Yes' ? 'None' : 'Site is not using HTTPS — Google penalizes HTTP sites'}",
-      "fix": "${desktop?.https === 'Yes' ? 'No action needed' : 'Install SSL certificate — free with Lets Encrypt through your hosting provider'}"
-    },
-    {
-      "title": "Image ALT Text",
-      "status": "warn",
-      "current": "estimated based on site analysis",
-      "issue": "specific issue",
-      "fix": "specific fix"
-    },
-    {
-      "title": "XML Sitemap",
-      "status": "warn",
-      "current": "estimated status",
-      "issue": "specific issue",
-      "fix": "Install Rank Math or Yoast SEO to auto-generate and submit sitemap"
-    },
-    {
-      "title": "Core Web Vitals (Ranking Factor)",
-      "status": "${(desktop?.performanceScore ?? 0) >= 90 ? 'pass' : (desktop?.performanceScore ?? 0) >= 50 ? 'warn' : 'fail'}",
-      "current": "Performance score: ${desktop?.performanceScore ?? 'N/A'}/100",
-      "issue": "${(desktop?.performanceScore ?? 0) < 90 ? 'Core Web Vitals are a direct Google ranking factor since 2021. Poor scores = lower ranking.' : 'Good performance scores'}",
-      "fix": "Apply all performance fixes in this report to improve Core Web Vitals"
-    }
-  ],
-  "wordpressSpecific": {
-    "phpVersion": "Detected from server headers or estimated — recommend PHP 8.2+",
-    "wordpressVersion": "Detected or estimated — should always be latest",
-    "pluginBloat": "estimated based on page size and request count",
-    "caching": "${(desktop?.performanceScore ?? 0) < 70 ? 'No caching detected — critical issue' : 'Some caching detected'}",
-    "imageOptimization": "${desktop?.imageOptimization !== 'N/A' ? 'Issues detected' : 'Status unknown'}",
-    "cdnDetected": "Not detected — recommended",
-    "gzipEnabled": "${desktop?.textCompression === 'N/A' ? 'Status unknown' : 'Detected'}",
-    "httpsEnabled": "${desktop?.https === 'Yes' ? 'Yes — HTTPS enabled' : 'No — HTTP only'}",
-    "recommendations": [
-      {
-        "priority": "high",
-        "action": "Install a caching plugin immediately",
-        "plugin": "WP Rocket (paid, best) or LiteSpeed Cache (free)",
-        "impact": "Can improve page speed score by 20-40 points instantly"
-      },
-      {
-        "priority": "high",
-        "action": "Optimize and compress all images",
-        "plugin": "Smush or ShortPixel — enable WebP conversion",
-        "impact": "Reduces page size by 40-60%, improves LCP significantly"
-      },
-      {
-        "priority": "high",
-        "action": "Install and configure Rank Math SEO",
-        "plugin": "Rank Math (free) — better than Yoast in 2026",
-        "impact": "Fixes meta tags, generates sitemap, adds schema markup automatically"
-      },
-      {
-        "priority": "medium",
-        "action": "Set up Cloudflare CDN",
-        "plugin": "Cloudflare (free tier) — add site and update nameservers",
-        "impact": "Reduces TTFB by 200-400ms, adds DDoS protection, free SSL"
-      },
-      {
-        "priority": "medium",
-        "action": "Upgrade PHP to version 8.2 or 8.3",
-        "plugin": "Done in hosting control panel — no plugin needed",
-        "impact": "Improves WordPress execution speed by up to 30%"
-      },
-      {
-        "priority": "low",
-        "action": "Clean database and remove unused plugins",
-        "plugin": "WP-Optimize (free) for database cleanup",
-        "impact": "Reduces database query time, improves TTFB"
-      }
-    ]
-  },
-  "topFixes": [
-    "specific #1 fix based on the actual data that will have most impact",
-    "specific #2 fix",
-    "specific #3 fix",
-    "specific #4 fix",
-    "specific #5 fix"
-  ],
-  "nextActions": {
-    "immediate": [
-      "specific action to do today based on the audit data",
-      "another specific immediate action",
-      "another immediate action"
-    ],
-    "shortTerm": [
-      "specific action for this week",
-      "another this week action",
-      "another"
-    ],
-    "longTerm": [
-      "specific action for this month",
-      "another this month action",
-      "another"
-    ]
-  }
-}`;
-
+{"url":"${url}","auditDate":"${auditDate}","overallScore":0,"performanceScore":${desktop?.performanceScore ?? 0},"seoScore":${desktop?.seoScore ?? 0},"mobileScore":${mobile?.performanceScore ?? 0},"securityScore":75,"grade":"B","summary":"FILL: 3 sentences about this site performance based on real scores above","coreWebVitals":{"lcp":{"value":"${desktop?.lcp ?? 'N/A'}","status":"FILL: good or needs-improvement or poor","description":"FILL: what this LCP means for this site","fix":"FILL: specific fix"},"fid":{"value":"${desktop?.fid ?? 'N/A'}","status":"FILL: good or needs-improvement or poor","description":"FILL: what FID means","fix":"FILL: specific fix"},"cls":{"value":"${desktop?.cls ?? 'N/A'}","status":"FILL: good or needs-improvement or poor","description":"FILL: what CLS means","fix":"FILL: specific fix"},"ttfb":{"value":"${desktop?.ttfb ?? 'N/A'}","status":"FILL: good or needs-improvement or poor","description":"FILL: what TTFB means","fix":"FILL: specific fix"},"fcp":{"value":"${desktop?.fcp ?? 'N/A'}","status":"FILL: good or needs-improvement or poor","description":"FILL: what FCP means","fix":"FILL: specific fix"}},"speedMetrics":{"desktop":${desktop?.performanceScore ?? 0},"mobile":${mobile?.performanceScore ?? 0},"loadTime":"FILL: estimated load time","pageSize":"${desktop?.totalByteWeight ?? 'N/A'}","requests":45},"issues":{"critical":[{"title":"FILL: critical issue title","description":"FILL: description","impact":"FILL: impact","fix":"FILL: exact fix","plugin":"FILL: plugin name or none"}],"warnings":[{"title":"FILL: warning title","description":"FILL: description","impact":"FILL: impact","fix":"FILL: exact fix","plugin":"FILL: plugin name or none"}],"passed":[{"title":"FILL: passing check","description":"FILL: why it is good"}]},"seoChecks":[{"title":"HTTPS Security","status":"${desktop?.https === 'Yes' ? 'pass' : 'fail'}","current":"${desktop?.https === 'Yes' ? 'HTTPS enabled and active' : 'HTTP only'}","issue":"${desktop?.https === 'Yes' ? 'None - HTTPS is properly configured' : 'Site not using HTTPS'}","fix":"${desktop?.https === 'Yes' ? 'No action needed' : 'Install free SSL via hosting control panel'}"},{"title":"Page Title Tag","status":"FILL: pass or warn or fail","current":"FILL: status","issue":"FILL: issue or none","fix":"FILL: fix or no action needed"},{"title":"Meta Description","status":"FILL: pass or warn or fail","current":"FILL: status","issue":"FILL: issue","fix":"FILL: fix"},{"title":"Image ALT Text","status":"FILL: pass or warn or fail","current":"FILL: status","issue":"FILL: issue","fix":"FILL: fix"},{"title":"XML Sitemap","status":"FILL: pass or warn or fail","current":"FILL: status","issue":"FILL: issue","fix":"FILL: fix"},{"title":"Core Web Vitals","status":"${(desktop?.performanceScore ?? 0) >= 90 ? 'pass' : (desktop?.performanceScore ?? 0) >= 50 ? 'warn' : 'fail'}","current":"Performance score: ${desktop?.performanceScore ?? 0}/100","issue":"FILL: issue or none","fix":"FILL: fix or no action needed"}],"wordpressSpecific":{"phpVersion":"Cannot detect externally - check WordPress Admin > Tools > Site Health. Recommend PHP 8.2+","wordpressVersion":"Cannot detect externally - check WordPress Admin > Dashboard > Updates","caching":"FILL: assessment based on TTFB value","imageOptimization":"FILL: assessment based on image data","cdnDetected":"Cannot detect externally - Cloudflare CDN recommended","gzipEnabled":"${desktop?.textCompression !== 'N/A' ? 'Issues detected - ' + (desktop?.textCompression ?? '') : 'Status unknown - verify via hosting'}","httpsEnabled":"${desktop?.https === 'Yes' ? 'Yes - HTTPS active and SSL certificate working correctly' : 'No - install SSL certificate immediately'}","pluginBloat":"FILL: assessment based on performance","recommendations":[{"priority":"high","action":"FILL: top action","plugin":"FILL: plugin name","impact":"FILL: impact"},{"priority":"high","action":"FILL: second action","plugin":"FILL: plugin name","impact":"FILL: impact"},{"priority":"medium","action":"FILL: third action","plugin":"FILL: plugin name","impact":"FILL: impact"},{"priority":"medium","action":"FILL: fourth action","plugin":"FILL: plugin name","impact":"FILL: impact"},{"priority":"low","action":"FILL: fifth action","plugin":"FILL: plugin name","impact":"FILL: impact"}]},"topFixes":["FILL: fix 1","FILL: fix 2","FILL: fix 3","FILL: fix 4","FILL: fix 5"],"nextActions":{"immediate":["FILL: action 1","FILL: action 2","FILL: action 3"],"shortTerm":["FILL: action 1","FILL: action 2","FILL: action 3"],"longTerm":["FILL: action 1","FILL: action 2","FILL: action 3"]}}`;
         const raw = await callOpenAI(SYSTEM_PROMPT, userPrompt);
         const parsed = JSON.parse(raw);
 
