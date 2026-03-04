@@ -59,29 +59,26 @@ function extractJSON(text: string): string {
 }
 
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY || ''}`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.GROQ_API_KEY || ''}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            max_tokens: 4000,
-            temperature: 0.3,
-            response_format: { type: 'json_object' },
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt },
-            ],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+            generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 4000,
+                responseMimeType: 'application/json',
+            },
         }),
     });
     const d = await res.json();
-    if (d.error) throw new Error(`Groq error: ${d.error.message}`);
-    const raw = d.choices?.[0]?.message?.content || '';
-    if (!raw) throw new Error('Empty response from AI');
+    if (d.error) throw new Error(`Gemini error: ${d.error.message}`);
+    const raw = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!raw) throw new Error('Empty response from Gemini');
     return extractJSON(raw);
 }
+
 
 async function fetchPageSpeed(url: string, strategy: 'desktop' | 'mobile') {
     const apiKey = process.env.PAGESPEED_API_KEY || '';
