@@ -127,158 +127,405 @@ export default function Home() {
     return 'POOR';
   }
 
-  function downloadReport() {
+  async function downloadReport() {
     if (!result) return;
 
-    const line = '─'.repeat(70);
-    const doubleLine = '═'.repeat(70);
+    // Dynamically load jsPDF
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-    const report = `
-${doubleLine}
-  WORDPRESS SPEED & SEO AUDIT REPORT
-  WordPress Audit Pro — Professional Website Analysis
-  ${doubleLine}
+    const pageW = 210;
+    const pageH = 297;
+    const margin = 16;
+    const contentW = pageW - margin * 2;
+    let y = 0;
 
-  Website: ${result.url}
-  Audit Date: ${result.auditDate}
-  Overall Grade: ${result.grade}  |  Overall Score: ${result.overallScore}/100
+    const colors = {
+      navy: [30, 58, 138] as [number,number,number],
+      blue: [37, 99, 235] as [number,number,number],
+      green: [22, 163, 74] as [number,number,number],
+      red: [220, 38, 38] as [number,number,number],
+      amber: [217, 119, 6] as [number,number,number],
+      gray: [107, 114, 128] as [number,number,number],
+      lightgray: [243, 244, 246] as [number,number,number],
+      white: [255, 255, 255] as [number,number,number],
+      dark: [17, 24, 39] as [number,number,number],
+    };
 
-${doubleLine}
+    function newPage() {
+      doc.addPage();
+      y = margin;
+    }
 
-EXECUTIVE SUMMARY
-${line}
-${result.summary}
+    function checkY(needed: number) {
+      if (y + needed > pageH - margin) newPage();
+    }
 
-${doubleLine}
-SCORES AT A GLANCE
-${line}
-  Performance Score:  ${result.performanceScore}/100
-  SEO Score:          ${result.seoScore}/100
-  Mobile Score:       ${result.mobileScore}/100
-  Security Score:     ${result.securityScore}/100
+    function scoreColor(s: number): [number,number,number] {
+      return s >= 80 ? colors.green : s >= 60 ? colors.amber : colors.red;
+    }
 
-  Desktop Speed:      ${result.speedMetrics?.desktop}/100
-  Mobile Speed:       ${result.speedMetrics?.mobile}/100
-  Estimated Load Time: ${result.speedMetrics?.loadTime}
-  Page Size:          ${result.speedMetrics?.pageSize}
-  HTTP Requests:      ${result.speedMetrics?.requests}
+    function statusColor(s: string): [number,number,number] {
+      return (s === 'good' || s === 'pass') ? colors.green : (s === 'needs-improvement' || s === 'warn') ? colors.amber : colors.red;
+    }
 
-${doubleLine}
-CORE WEB VITALS
-${line}
-These are Google's official ranking signals. Poor scores = lower Google ranking.
+    function wrapText(text: string, maxW: number, fontSize: number): string[] {
+      doc.setFontSize(fontSize);
+      return doc.splitTextToSize(text || '', maxW);
+    }
 
-  LCP (Largest Contentful Paint)
-  Value: ${result.coreWebVitals?.lcp?.value}  |  Status: ${result.coreWebVitals?.lcp?.status?.toUpperCase()}
-  What it means: ${result.coreWebVitals?.lcp?.description}
-  How to fix: ${result.coreWebVitals?.lcp?.fix}
+    // ── COVER PAGE ──
+    doc.setFillColor(...colors.navy);
+    doc.rect(0, 0, pageW, pageH, 'F');
 
-  FID / INP (Interaction to Next Paint)
-  Value: ${result.coreWebVitals?.fid?.value}  |  Status: ${result.coreWebVitals?.fid?.status?.toUpperCase()}
-  What it means: ${result.coreWebVitals?.fid?.description}
-  How to fix: ${result.coreWebVitals?.fid?.fix}
+    doc.setFillColor(...colors.blue);
+    doc.rect(0, 0, pageW, 80, 'F');
 
-  CLS (Cumulative Layout Shift)
-  Value: ${result.coreWebVitals?.cls?.value}  |  Status: ${result.coreWebVitals?.cls?.status?.toUpperCase()}
-  What it means: ${result.coreWebVitals?.cls?.description}
-  How to fix: ${result.coreWebVitals?.cls?.fix}
+    doc.setTextColor(...colors.white);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('WordPress Audit Pro', margin, 30);
 
-  TTFB (Time to First Byte)
-  Value: ${result.coreWebVitals?.ttfb?.value}  |  Status: ${result.coreWebVitals?.ttfb?.status?.toUpperCase()}
-  What it means: ${result.coreWebVitals?.ttfb?.description}
-  How to fix: ${result.coreWebVitals?.ttfb?.fix}
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Professional Speed & SEO Report', margin, 42);
 
-  FCP (First Contentful Paint)
-  Value: ${result.coreWebVitals?.fcp?.value}  |  Status: ${result.coreWebVitals?.fcp?.status?.toUpperCase()}
-  What it means: ${result.coreWebVitals?.fcp?.description}
-  How to fix: ${result.coreWebVitals?.fcp?.fix}
+    doc.setFontSize(10);
+    doc.setTextColor(180, 200, 255);
+    doc.text(`${result.url}`, margin, 56);
+    doc.text(`Audit Date: ${result.auditDate}`, margin, 64);
 
-${doubleLine}
-CRITICAL ISSUES — Fix These First
-${line}
-${result.issues?.critical?.length === 0 ? '  ✓ No critical issues found.' : result.issues?.critical?.map((issue, i) => `
-  Issue ${i + 1}: ${issue.title}
-  Impact: ${issue.impact}
-  Problem: ${issue.description}
-  Solution: ${issue.fix}${issue.plugin ? `\n  Recommended Plugin: ${issue.plugin}` : ''}
-  ${line}`).join('\n')}
+    // Grade box
+    doc.setFillColor(...colors.white);
+    doc.roundedRect(pageW - 60, 20, 44, 44, 4, 4, 'F');
+    doc.setTextColor(...scoreColor(result.overallScore));
+    doc.setFontSize(28);
+    doc.setFont('helvetica', 'bold');
+    doc.text(result.grade, pageW - 42, 42, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setTextColor(...colors.gray);
+    doc.text(`${result.overallScore}/100`, pageW - 42, 54, { align: 'center' });
 
-${doubleLine}
-WARNINGS — Fix These Soon
-${line}
-${result.issues?.warnings?.length === 0 ? '  ✓ No warnings found.' : result.issues?.warnings?.map((issue, i) => `
-  Warning ${i + 1}: ${issue.title}
-  Impact: ${issue.impact}
-  Problem: ${issue.description}
-  Solution: ${issue.fix}${issue.plugin ? `\n  Recommended Plugin: ${issue.plugin}` : ''}
-  ${line}`).join('\n')}
+    // Scores grid on cover
+    const scores = [
+      { label: 'Performance', val: result.performanceScore },
+      { label: 'SEO', val: result.seoScore },
+      { label: 'Mobile', val: result.mobileScore },
+      { label: 'Security', val: result.securityScore },
+    ];
+    let sx = margin;
+    scores.forEach(s => {
+      doc.setFillColor(255,255,255,0.1);
+      doc.setDrawColor(255,255,255,0.2);
+      doc.roundedRect(sx, 100, 40, 28, 3, 3, 'S');
+      doc.setTextColor(...scoreColor(s.val));
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text(String(s.val), sx + 20, 114, { align: 'center' });
+      doc.setFontSize(7);
+      doc.setTextColor(180, 200, 255);
+      doc.text(s.label.toUpperCase(), sx + 20, 122, { align: 'center' });
+      sx += 46;
+    });
 
-${doubleLine}
-WHAT YOU ARE DOING RIGHT
-${line}
-${result.issues?.passed?.map(p => `  ✓ ${p.title}: ${p.description}`).join('\n')}
+    // Summary box
+    doc.setFillColor(20, 40, 80);
+    doc.roundedRect(margin, 140, contentW, 60, 4, 4, 'F');
+    doc.setTextColor(180, 200, 255);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EXECUTIVE SUMMARY', margin + 8, 152);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...colors.white);
+    doc.setFontSize(9);
+    const sumLines = wrapText(result.summary || '', contentW - 16, 9);
+    sumLines.slice(0, 5).forEach((line, i) => {
+      doc.text(line, margin + 8, 160 + i * 6);
+    });
 
-${doubleLine}
-SEO CHECKS
-${line}
-${result.seoChecks?.map(c => `
-  [${c.status.toUpperCase()}] ${c.title}
-  Current: ${c.current}
-  Issue: ${c.issue}
-  Fix: ${c.fix}`).join('\n')}
+    // Footer
+    doc.setTextColor(100, 130, 180);
+    doc.setFontSize(8);
+    doc.text('Confidential — Prepared exclusively for: ' + result.url, margin, pageH - 10);
 
-${doubleLine}
-WORDPRESS-SPECIFIC ANALYSIS
-${line}
-  PHP Version:          ${result.wordpressSpecific?.phpVersion}
-  WordPress Version:    ${result.wordpressSpecific?.wordpressVersion}
-  Caching Status:       ${result.wordpressSpecific?.caching}
-  Image Optimization:   ${result.wordpressSpecific?.imageOptimization}
-  CDN Detected:         ${result.wordpressSpecific?.cdnDetected}
-  GZIP Compression:     ${result.wordpressSpecific?.gzipEnabled}
-  HTTPS:                ${result.wordpressSpecific?.httpsEnabled}
-  Plugin Bloat:         ${result.wordpressSpecific?.pluginBloat}
+    // ── PAGE 2 — CORE WEB VITALS ──
+    newPage();
+    doc.setFillColor(...colors.navy);
+    doc.rect(0, 0, pageW, 16, 'F');
+    doc.setTextColor(...colors.white);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CORE WEB VITALS', margin, 11);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text("Google's official ranking signals", pageW - margin, 11, { align: 'right' });
+    y = 24;
 
-PLUGIN RECOMMENDATIONS
-${line}
-${result.wordpressSpecific?.recommendations?.map((r, i) => `
-  ${i + 1}. [${r.priority.toUpperCase()}] ${r.action}
-     Plugin: ${r.plugin}
-     Impact: ${r.impact}`).join('\n')}
+    const vitals = [
+      { key: 'LCP', data: result.coreWebVitals?.lcp },
+      { key: 'FID/INP', data: result.coreWebVitals?.fid },
+      { key: 'CLS', data: result.coreWebVitals?.cls },
+      { key: 'TTFB', data: result.coreWebVitals?.ttfb },
+      { key: 'FCP', data: result.coreWebVitals?.fcp },
+    ];
 
-${doubleLine}
-TOP PRIORITY FIXES
-${line}
-${result.topFixes?.map((fix, i) => `  ${i + 1}. ${fix}`).join('\n')}
+    vitals.forEach(v => {
+      if (!v.data) return;
+      const col = statusColor(v.data.status);
+      checkY(36);
+      doc.setFillColor(...colors.lightgray);
+      doc.roundedRect(margin, y, contentW, 32, 3, 3, 'F');
+      doc.setFillColor(...col);
+      doc.rect(margin, y, 3, 32, 'F');
+      doc.setTextColor(...colors.dark);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(v.key, margin + 8, y + 9);
+      doc.setTextColor(...col);
+      doc.setFontSize(12);
+      doc.text(v.data.value || 'N/A', pageW - margin - 2, y + 9, { align: 'right' });
+      doc.setTextColor(...colors.gray);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      const descLines = wrapText(v.data.description || '', contentW - 16, 7.5);
+      descLines.slice(0,1).forEach((l, i) => doc.text(l, margin + 8, y + 17 + i * 5));
+      doc.setTextColor(...colors.blue);
+      const fixLines = wrapText('Fix: ' + (v.data.fix || ''), contentW - 16, 7.5);
+      fixLines.slice(0,1).forEach((l, i) => doc.text(l, margin + 8, y + 26 + i * 5));
+      y += 36;
+    });
 
-${doubleLine}
-ACTION PLAN
-${line}
+    // ── PAGE 3 — ISSUES ──
+    newPage();
+    doc.setFillColor(...colors.navy);
+    doc.rect(0, 0, pageW, 16, 'F');
+    doc.setTextColor(...colors.white);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ISSUES & RECOMMENDATIONS', margin, 11);
+    y = 24;
 
-  IMMEDIATE (Do Today):
-${result.nextActions?.immediate?.map(a => `    • ${a}`).join('\n')}
+    // Critical
+    if (result.issues?.critical?.length > 0) {
+      doc.setFillColor(...colors.red);
+      doc.roundedRect(margin, y, contentW, 10, 2, 2, 'F');
+      doc.setTextColor(...colors.white);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`CRITICAL ISSUES (${result.issues.critical.length})`, margin + 4, y + 7);
+      y += 14;
 
-  SHORT TERM (This Week):
-${result.nextActions?.shortTerm?.map(a => `    • ${a}`).join('\n')}
+      result.issues.critical.forEach((issue, idx) => {
+        const lines = wrapText(issue.fix || '', contentW - 60, 8);
+        const boxH = Math.max(28, 14 + lines.length * 5);
+        checkY(boxH + 4);
+        doc.setFillColor(255, 240, 240);
+        doc.roundedRect(margin, y, contentW, boxH, 2, 2, 'F');
+        doc.setFillColor(...colors.red);
+        doc.rect(margin, y, 3, boxH, 'F');
+        doc.setTextColor(...colors.dark);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${idx+1}. ${issue.title}`, margin + 7, y + 8);
+        doc.setTextColor(...colors.red);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Impact: ${issue.impact || ''}`, margin + 7, y + 15);
+        doc.setTextColor(...colors.blue);
+        lines.forEach((l, i) => doc.text(l, margin + 7, y + 22 + i * 5));
+        if (issue.plugin) {
+          doc.setTextColor(22, 163, 74);
+          doc.text(`Plugin: ${issue.plugin}`, margin + 7, y + 22 + lines.length * 5);
+        }
+        y += boxH + 4;
+      });
+      y += 4;
+    }
 
-  LONG TERM (This Month):
-${result.nextActions?.longTerm?.map(a => `    • ${a}`).join('\n')}
+    // Warnings
+    if (result.issues?.warnings?.length > 0) {
+      checkY(14);
+      doc.setFillColor(...colors.amber);
+      doc.roundedRect(margin, y, contentW, 10, 2, 2, 'F');
+      doc.setTextColor(...colors.white);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`WARNINGS (${result.issues.warnings.length})`, margin + 4, y + 7);
+      y += 14;
 
-${doubleLine}
-  Report generated by WordPress Audit Pro
-  wordpressauditpro.vercel.app
-  
-  This report is confidential and prepared exclusively for: ${result.url}
-${doubleLine}
-`.trim();
+      result.issues.warnings.forEach((issue, idx) => {
+        const lines = wrapText(issue.fix || '', contentW - 60, 8);
+        const boxH = Math.max(28, 14 + lines.length * 5);
+        checkY(boxH + 4);
+        doc.setFillColor(255, 251, 235);
+        doc.roundedRect(margin, y, contentW, boxH, 2, 2, 'F');
+        doc.setFillColor(...colors.amber);
+        doc.rect(margin, y, 3, boxH, 'F');
+        doc.setTextColor(...colors.dark);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${idx+1}. ${issue.title}`, margin + 7, y + 8);
+        doc.setTextColor(...colors.amber);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Impact: ${issue.impact || ''}`, margin + 7, y + 15);
+        doc.setTextColor(...colors.blue);
+        lines.forEach((l, i) => doc.text(l, margin + 7, y + 22 + i * 5));
+        y += boxH + 4;
+      });
+    }
 
-    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
-    const urlObj = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = urlObj;
-    a.download = `wordpress-audit-${result.url.replace(/https?:\/\//, '').replace(/\//g, '-')}.txt`;
-    a.click();
-    URL.revokeObjectURL(urlObj);
+    // Passing
+    if (result.issues?.passed?.length > 0) {
+      checkY(14);
+      doc.setFillColor(...colors.green);
+      doc.roundedRect(margin, y, contentW, 10, 2, 2, 'F');
+      doc.setTextColor(...colors.white);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PASSING CHECKS', margin + 4, y + 7);
+      y += 14;
+      result.issues.passed.forEach(p => {
+        checkY(12);
+        doc.setFillColor(240, 253, 244);
+        doc.roundedRect(margin, y, contentW, 10, 2, 2, 'F');
+        doc.setTextColor(...colors.green);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('✓', margin + 4, y + 7);
+        doc.setTextColor(...colors.dark);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${p.title}: ${p.description}`, margin + 10, y + 7);
+        y += 13;
+      });
+    }
+
+    // ── PAGE 4 — SEO CHECKS ──
+    newPage();
+    doc.setFillColor(...colors.navy);
+    doc.rect(0, 0, pageW, 16, 'F');
+    doc.setTextColor(...colors.white);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SEO CHECKS', margin, 11);
+    y = 24;
+
+    result.seoChecks?.forEach(c => {
+      const col = statusColor(c.status);
+      const fixLines = wrapText(c.fix || '', contentW - 16, 8);
+      const boxH = Math.max(28, 14 + fixLines.length * 5);
+      checkY(boxH + 4);
+      doc.setFillColor(...colors.lightgray);
+      doc.roundedRect(margin, y, contentW, boxH, 2, 2, 'F');
+      doc.setFillColor(...col);
+      doc.rect(margin, y, 3, boxH, 'F');
+      const statusLabel = c.status === 'pass' || c.status === 'good' ? 'PASS' : c.status === 'warn' || c.status === 'needs-improvement' ? 'WARN' : 'FAIL';
+      doc.setFillColor(...col);
+      doc.roundedRect(margin + 7, y + 4, 16, 7, 1, 1, 'F');
+      doc.setTextColor(...colors.white);
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'bold');
+      doc.text(statusLabel, margin + 15, y + 9, { align: 'center' });
+      doc.setTextColor(...colors.dark);
+      doc.setFontSize(9);
+      doc.text(c.title, margin + 26, y + 9);
+      doc.setTextColor(...colors.gray);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Current: ${c.current || ''}`, margin + 7, y + 17);
+      doc.setTextColor(...colors.blue);
+      fixLines.forEach((l, i) => doc.text(l, margin + 7, y + 23 + i * 5));
+      y += boxH + 4;
+    });
+
+    // ── PAGE 5 — ACTION PLAN ──
+    newPage();
+    doc.setFillColor(...colors.navy);
+    doc.rect(0, 0, pageW, 16, 'F');
+    doc.setTextColor(...colors.white);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ACTION PLAN & TOP FIXES', margin, 11);
+    y = 24;
+
+    // Top fixes
+    doc.setFillColor(...colors.blue);
+    doc.roundedRect(margin, y, contentW, 10, 2, 2, 'F');
+    doc.setTextColor(...colors.white);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOP PRIORITY FIXES', margin + 4, y + 7);
+    y += 14;
+
+    result.topFixes?.forEach((fix, i) => {
+      const lines = wrapText(fix, contentW - 20, 8.5);
+      const boxH = Math.max(14, 6 + lines.length * 6);
+      checkY(boxH + 3);
+      doc.setFillColor(239, 246, 255);
+      doc.roundedRect(margin, y, contentW, boxH, 2, 2, 'F');
+      doc.setFillColor(...colors.blue);
+      doc.circle(margin + 7, y + boxH/2, 4, 'F');
+      doc.setTextColor(...colors.white);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text(String(i+1), margin + 7, y + boxH/2 + 2.5, { align: 'center' });
+      doc.setTextColor(...colors.dark);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      lines.forEach((l, li) => doc.text(l, margin + 16, y + 7 + li * 6));
+      y += boxH + 3;
+    });
+
+    y += 8;
+
+    const actionGroups = [
+      { label: 'DO TODAY', items: result.nextActions?.immediate, color: colors.red as [number,number,number], bg: [255,240,240] as [number,number,number] },
+      { label: 'THIS WEEK', items: result.nextActions?.shortTerm, color: colors.amber as [number,number,number], bg: [255,251,235] as [number,number,number] },
+      { label: 'THIS MONTH', items: result.nextActions?.longTerm, color: colors.green as [number,number,number], bg: [240,253,244] as [number,number,number] },
+    ];
+
+    actionGroups.forEach(g => {
+      checkY(20);
+      doc.setFillColor(...g.color);
+      doc.roundedRect(margin, y, contentW, 10, 2, 2, 'F');
+      doc.setTextColor(...colors.white);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(g.label, margin + 4, y + 7);
+      y += 13;
+      g.items?.forEach(a => {
+        const lines = wrapText(a, contentW - 16, 8);
+        const boxH = Math.max(12, 5 + lines.length * 5);
+        checkY(boxH + 3);
+        doc.setFillColor(...g.bg);
+        doc.roundedRect(margin, y, contentW, boxH, 2, 2, 'F');
+        doc.setTextColor(...g.color);
+        doc.setFontSize(10);
+        doc.text('→', margin + 5, y + boxH/2 + 3);
+        doc.setTextColor(...colors.dark);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        lines.forEach((l, li) => doc.text(l, margin + 13, y + 7 + li * 5));
+        y += boxH + 3;
+      });
+      y += 5;
+    });
+
+    // Footer on all pages
+    const totalPages = (doc as unknown as { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setFillColor(...colors.navy);
+      doc.rect(0, pageH - 10, pageW, 10, 'F');
+      doc.setTextColor(150, 170, 220);
+      doc.setFontSize(7);
+      doc.text('WordPress Audit Pro', margin, pageH - 4);
+      doc.text(`Page ${p} of ${totalPages}`, pageW / 2, pageH - 4, { align: 'center' });
+      doc.text(result.url, pageW - margin, pageH - 4, { align: 'right' });
+    }
+
+    const filename = `wordpress-audit-${result.url.replace(/https?:\/\//, '').replace(/[^a-z0-9]/gi, '-')}.pdf`;
+    doc.save(filename);
   }
 
   const ScoreCircle = ({ score, label }: { score: number; label: string }) => (

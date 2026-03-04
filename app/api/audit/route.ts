@@ -395,6 +395,43 @@ Return this EXACT JSON structure:
         const raw = await callOpenAI(SYSTEM_PROMPT, userPrompt);
         const parsed = JSON.parse(raw);
 
+        // Override AI hallucinations with real PageSpeed data
+        if (desktop?.https === 'Yes') {
+            if (Array.isArray(parsed.seoChecks)) {
+                const httpsCheck = parsed.seoChecks.find((c: { title: string }) => c.title?.toLowerCase().includes('https'));
+                if (httpsCheck) {
+                    httpsCheck.status = 'pass';
+                    httpsCheck.current = 'HTTPS enabled — SSL certificate active';
+                    httpsCheck.issue = 'None — HTTPS is properly configured';
+                    httpsCheck.fix = 'No action needed — SSL is active';
+                }
+            }
+            if (parsed.wordpressSpecific) {
+                parsed.wordpressSpecific.httpsEnabled = 'Yes — HTTPS active';
+            }
+            if (Array.isArray(parsed.issues?.critical)) {
+                parsed.issues.critical = parsed.issues.critical.filter(
+                    (i: { title: string }) => !i.title?.toLowerCase().includes('https') && !i.title?.toLowerCase().includes('ssl')
+                );
+            }
+            if (Array.isArray(parsed.issues?.warnings)) {
+                parsed.issues.warnings = parsed.issues.warnings.filter(
+                    (i: { title: string }) => !i.title?.toLowerCase().includes('https') && !i.title?.toLowerCase().includes('ssl')
+                );
+            }
+        }
+
+        // Override scores with real PageSpeed data
+        if (desktop?.performanceScore) parsed.performanceScore = desktop.performanceScore;
+        if (desktop?.seoScore) parsed.seoScore = desktop.seoScore;
+        if (mobile?.performanceScore) parsed.mobileScore = mobile.performanceScore;
+        if (desktop?.performanceScore && mobile?.performanceScore) {
+            parsed.overallScore = Math.round((desktop.performanceScore + mobile.performanceScore + (desktop.seoScore || 80)) / 3);
+            parsed.grade = parsed.overallScore >= 90 ? 'A' : parsed.overallScore >= 75 ? 'B' : parsed.overallScore >= 60 ? 'C' : parsed.overallScore >= 45 ? 'D' : 'F';
+        }
+        if (desktop?.performanceScore) parsed.speedMetrics.desktop = desktop.performanceScore;
+        if (mobile?.performanceScore) parsed.speedMetrics.mobile = mobile.performanceScore;
+
         return NextResponse.json({ ok: true, data: parsed });
 
     } catch (err: unknown) {
