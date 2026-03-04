@@ -51,11 +51,39 @@ Be specific, accurate, and professional. Give exact plugin names, exact settings
 OUTPUT: ONLY valid JSON. No markdown. No explanation. No text before or after.`;
 
 function extractJSON(text: string): string {
-    const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+    // Remove markdown code blocks
+    let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
     const start = cleaned.indexOf('{');
     const end = cleaned.lastIndexOf('}');
     if (start === -1 || end === -1 || end <= start) throw new Error('No valid JSON found in response');
-    return cleaned.slice(start, end + 1);
+    cleaned = cleaned.slice(start, end + 1);
+
+    // Fix common JSON issues from AI output
+    cleaned = cleaned
+        .replace(/,\s*}/g, '}')          // trailing comma in object
+        .replace(/,\s*]/g, ']')          // trailing comma in array
+        .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":')  // unquoted keys
+        .replace(/:\s*'([^']*)'/g, ': "$1"')  // single quotes to double quotes
+        .replace(/[\x00-\x1F\x7F]/g, ' '); // remove control characters
+
+    // Validate — try parse, if fails try to salvage
+    try {
+        JSON.parse(cleaned);
+        return cleaned;
+    } catch {
+        // Last resort — find last valid closing brace
+        let lastValid = cleaned;
+        for (let i = cleaned.length - 1; i > 0; i--) {
+            if (cleaned[i] === '}') {
+                try {
+                    JSON.parse(cleaned.slice(0, i + 1));
+                    lastValid = cleaned.slice(0, i + 1);
+                    break;
+                } catch { continue; }
+            }
+        }
+        return lastValid;
+    }
 }
 
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
