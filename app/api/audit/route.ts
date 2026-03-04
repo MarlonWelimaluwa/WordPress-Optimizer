@@ -238,29 +238,47 @@ Return ONLY this JSON. No extra text. Fill in all string values with professiona
 
         const parsed = JSON.parse(raw);
 
-        // Override AI hallucinations with real PageSpeed data
+        // ── HARD OVERRIDE — real PageSpeed data always wins over AI guesses ──
         if (desktop?.https === 'Yes') {
+            // Fix SEO checks
             if (Array.isArray(parsed.seoChecks)) {
                 const httpsCheck = parsed.seoChecks.find((c: { title: string }) => c.title?.toLowerCase().includes('https'));
                 if (httpsCheck) {
                     httpsCheck.status = 'pass';
                     httpsCheck.current = 'HTTPS enabled — SSL certificate active';
                     httpsCheck.issue = 'None — HTTPS is properly configured';
-                    httpsCheck.fix = 'No action needed — SSL is active';
+                    httpsCheck.fix = 'No action needed — SSL certificate is active and working';
                 }
             }
+            // Fix wordpressSpecific
             if (parsed.wordpressSpecific) {
-                parsed.wordpressSpecific.httpsEnabled = 'Yes — HTTPS active';
+                parsed.wordpressSpecific.httpsEnabled = 'Yes — HTTPS active and SSL certificate working correctly';
             }
+            // Remove HTTPS from critical issues
             if (Array.isArray(parsed.issues?.critical)) {
                 parsed.issues.critical = parsed.issues.critical.filter(
                     (i: { title: string }) => !i.title?.toLowerCase().includes('https') && !i.title?.toLowerCase().includes('ssl')
                 );
             }
+            // Remove HTTPS from warnings
             if (Array.isArray(parsed.issues?.warnings)) {
                 parsed.issues.warnings = parsed.issues.warnings.filter(
                     (i: { title: string }) => !i.title?.toLowerCase().includes('https') && !i.title?.toLowerCase().includes('ssl')
                 );
+            }
+            // Fix summary text that wrongly mentions no HTTPS
+            if (parsed.summary) {
+                parsed.summary = parsed.summary
+                    .replace(/not utilizing https/gi, 'utilizing HTTPS correctly')
+                    .replace(/not using https/gi, 'using HTTPS correctly')
+                    .replace(/lacks? https/gi, 'has HTTPS enabled')
+                    .replace(/no https/gi, 'HTTPS enabled')
+                    .replace(/without https/gi, 'with HTTPS enabled')
+                    .replace(/http only/gi, 'HTTPS active')
+                    .replace(/missing (?:an? )?ssl/gi, 'has SSL active')
+                    .replace(/no ssl/gi, 'SSL active')
+                    .replace(/install(?:ing)? (?:an? )?ssl/gi, 'SSL is already installed')
+                    .replace(/requires? (?:an? )?ssl/gi, 'SSL is active');
             }
         }
 
