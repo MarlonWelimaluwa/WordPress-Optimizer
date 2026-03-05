@@ -240,6 +240,16 @@ Return ONLY this JSON. No extra text. Fill in all string values with professiona
         console.log(raw.substring(0, 500));
         console.log('=== END ===');
 
+        // HTTPS debug
+        console.log('=== HTTPS DEBUG ===');
+        console.log('desktop is null?', desktop === null);
+        console.log('desktop.https raw value:', desktop?.https);
+        console.log('httpsStatus will be:', desktop?.https === 'Yes');
+        const lhr2 = (desktopData as Record<string, unknown>).lighthouseResult as Record<string, unknown> || {};
+        const audits2 = lhr2.audits as Record<string, Record<string, unknown>> || {};
+        console.log('is-on-https score:', audits2['is-on-https']?.score);
+        console.log('=== END HTTPS DEBUG ===');
+
         const parsed = JSON.parse(raw);
 
         // ── HARD OVERRIDE — real PageSpeed data always wins ──
