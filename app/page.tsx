@@ -601,7 +601,7 @@ export default function Home() {
 
         {/* LOADING */}
         {loading && (
-            <div style={{ maxWidth: 600, margin: '80px auto', padding: '0 24px', textAlign: 'center' }}>
+            <div style={{ maxWidth: 600, margin: '80px auto 120px', padding: '0 24px', textAlign: 'center' }}>
               <div style={{ background: 'white', borderRadius: 20, padding: 48, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: '1px solid #e5e7eb' }}>
                 <div style={{ width: 64, height: 64, borderRadius: '50%', border: '4px solid #e5e7eb', borderTop: '4px solid #2563eb', margin: '0 auto 24px', animation: 'spin 1s linear infinite' }} />
                 <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Auditing Your Site</div>
@@ -852,9 +852,43 @@ export default function Home() {
         )}
 
         {/* FOOTER */}
-        {!result && !loading && (
-            <div style={{ textAlign: 'center', padding: '60px 24px', color: '#9ca3af', fontSize: 13 }}>
-              WordPress Audit Pro · Free Professional Site Analysis
+        {!result && (
+            <div style={{ background: '#0f172a', marginTop: 0, padding: '48px 40px 32px' }}>
+              <div style={{ maxWidth: 900, margin: '0 auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 32, marginBottom: 40 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                      <div style={{ width: 36, height: 36, background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="white" strokeWidth="0"/>
+                        </svg>
+                      </div>
+                      <span style={{ fontWeight: 800, fontSize: 16, color: 'white' }}>WordPress Audit Pro</span>
+                    </div>
+                    <p style={{ fontSize: 13, color: '#64748b', maxWidth: 280, lineHeight: 1.7, margin: 0 }}>
+                      Professional WordPress speed & SEO audits powered by Google PageSpeed Insights and AI analysis.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 48, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#475569', letterSpacing: 1.5, marginBottom: 14 }}>WHAT WE CHECK</div>
+                      {['Core Web Vitals', 'SEO Analysis', 'Security Check', 'Mobile Score', 'Plugin Audit'].map(item => (
+                          <div key={item} style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>{item}</div>
+                      ))}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#475569', letterSpacing: 1.5, marginBottom: 14 }}>POWERED BY</div>
+                      {['Google PageSpeed API', 'Gemini AI Analysis', 'Lighthouse Metrics', 'Real-time Data'].map(item => (
+                          <div key={item} style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>{item}</div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ borderTop: '1px solid #1e293b', paddingTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                  <div style={{ fontSize: 12, color: '#475569' }}>© 2026 WordPress Audit Pro · Free Professional Site Analysis</div>
+                  <div style={{ fontSize: 12, color: '#475569' }}>Built for WordPress site owners who want real results</div>
+                </div>
+              </div>
             </div>
         )}
       </div>
