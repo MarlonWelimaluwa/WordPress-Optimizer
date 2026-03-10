@@ -460,11 +460,21 @@ Return ONLY this JSON (fill all FILL values with specific professional content):
       });
     }
 
-    // ── PAGE 5: SEO CHECKS ──
-    np();
-    doc.setFillColor(30,58,138);doc.rect(0,0,W,13,'F');
-    doc.setTextColor(255,255,255);doc.setFontSize(10);doc.setFont('helvetica','bold');
-    doc.text('SEO CHECKS',M,9.5);y=20;
+    // ── SEO CHECKS ──
+    y+=8;
+    if(y>H-80){
+      // enough room for a new full page
+      np();
+      doc.setFillColor(30,58,138);doc.rect(0,0,W,13,'F');
+      doc.setTextColor(255,255,255);doc.setFontSize(10);doc.setFont('helvetica','bold');
+      doc.text('SEO CHECKS',M,9.5);y=20;
+    } else {
+      // continue on same page with inline section header
+      cy(13);
+      doc.setFillColor(30,58,138);doc.roundedRect(M,y,CW,9,1,1,'F');
+      doc.setTextColor(255,255,255);doc.setFontSize(9);doc.setFont('helvetica','bold');
+      doc.text('SEO CHECKS',M+5,y+6.2);y+=13;
+    }
     r.seoChecks?.forEach(c=>{
       const col=stcc(c.status);
       const curL=wt('Current: '+(c.current||''),CW-14,7.5);
