@@ -631,7 +631,7 @@ Return ONLY this JSON structure (fill all FILL values with specific professional
 
         {/* HERO */}
         {!result && !loading && (
-            <div style={{ background:'linear-gradient(135deg,#1e3a8a,#2563eb)', padding:'80px 40px', textAlign:'center' }}>
+            <div style={{ background:'linear-gradient(135deg,#1e3a8a,#2563eb)', padding:'80px 40px', textAlign:'center', minHeight:'calc(100vh - 64px - 57px)', display:'flex', flexDirection:'column', justifyContent:'center' }}>
               <div style={{ display:'inline-block', padding:'5px 14px', borderRadius:100, background:'rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.9)', fontSize:10, fontWeight:700, letterSpacing:1.5, marginBottom:24 }}>POWERED BY GOOGLE PAGESPEED + GEMINI AI</div>
               <h1 style={{ fontSize:'clamp(30px,5vw,54px)', fontWeight:900, color:'white', margin:'0 0 16px', letterSpacing:-1.5, lineHeight:1.1 }}>Is Your WordPress Site<br /><span style={{ color:'#93c5fd' }}>Losing You Money?</span></h1>
               <p style={{ fontSize:17, color:'rgba(255,255,255,0.75)', maxWidth:500, margin:'0 auto 40px', lineHeight:1.7 }}>Get a complete professional audit — Core Web Vitals, SEO, Security, and exact WordPress fixes. Free.</p>
