@@ -127,7 +127,11 @@ export default function Home() {
       const auditDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       const httpsOk = site?.https ?? clean.startsWith('https://');
 
-      const SYSTEM = `You are "WordPress Audit Pro AI" — a world-class WordPress performance and SEO specialist. You analyse real PageSpeed data and generate precise, actionable audit reports. Be brutally specific — exact plugin names, exact settings, measurable impact. OUTPUT: ONLY valid JSON. No markdown. No explanation outside JSON.`;
+      const SYSTEM = `You are "WordPress Audit Pro AI" — a world-class WordPress performance and SEO specialist. You analyse real PageSpeed data and generate precise, actionable audit reports. Be brutally specific — exact plugin names, exact settings, measurable impact. OUTPUT: ONLY valid JSON. No markdown. No explanation outside JSON.
+
+STRICT RULES — never break these:
+1. wordpressVersion: ALWAYS output exactly "Cannot detect externally — check WP Admin > Dashboard > Updates". NEVER invent, guess, or hallucinate a version number. Even if you think you know it.
+2. TTFB severity: TTFB < 600ms = good. TTFB 600ms–1800ms = needs-improvement (WARNING only, NEVER critical). TTFB > 1800ms = poor (critical). Never put TTFB in critical issues unless it exceeds 1800ms.`;
 
       const USER = `Audit this WordPress site using the REAL data below.
 
@@ -210,6 +214,15 @@ Return ONLY this JSON structure (fill all FILL values with specific professional
       parsed.securityScore    = httpsOk ? 82 : 20;
       parsed.url              = clean;
       parsed.auditDate        = auditDate;
+      // Fix 1: Always lock WP version — never show hallucinated version
+      if (parsed.wordpressSpecific) {
+        parsed.wordpressSpecific.wordpressVersion = 'Cannot detect externally — check WP Admin > Dashboard > Updates';
+      }
+      // Fix 2: TTFB 600ms-1800ms must be warning only — remove from critical if misclassified
+      const ttfbMs = parseFloat((desktop.ttfb || '0').replace(/[^0-9.]/g, '')) * (desktop.ttfb?.includes('s') && !desktop.ttfb?.includes('ms') ? 1000 : 1);
+      if (ttfbMs < 1800 && Array.isArray(parsed.issues?.critical)) {
+        parsed.issues.critical = parsed.issues.critical.filter((i: IssueItem) => !i.title?.toLowerCase().includes('ttfb') && !i.title?.toLowerCase().includes('server response') && !i.title?.toLowerCase().includes('time to first byte'));
+      }
 
       setLoadingStep(4);
       setResult(parsed);
