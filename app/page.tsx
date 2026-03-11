@@ -234,14 +234,14 @@ Return ONLY this JSON (fill all FILL values with specific professional content):
     function scc(s:number):[number,number,number]{return s>=80?[22,163,74]:s>=60?[217,119,6]:[220,38,38];}
     function stcc(s:string):[number,number,number]{return(s==='pass'||s==='good')?[22,163,74]:(s==='warn'||s==='needs-improvement')?[217,119,6]:[220,38,38];}
 
-    function addFooter(){
+    function addFooter(pn:number,tot:number){
       doc.setFillColor(30,58,138);doc.rect(0,H-8,W,8,'F');
       doc.setTextColor(180,200,255);doc.setFontSize(7);doc.setFont('helvetica','normal');
       doc.text('WordPress Audit Pro',M,H-3);
-      doc.text(`Page ${pageNum}`,W/2,H-3,{align:'center'});
+      doc.text(`Page ${pn} of ${tot}`,W/2,H-3,{align:'center'});
       doc.text(cl(r.url),W-M,H-3,{align:'right'});
     }
-    function np(){addFooter();doc.addPage();pageNum++;y=20;}
+    function np(){doc.addPage();pageNum++;y=20;}
     function cy(n:number){if(y+n>H-12)np();}
 
     // ── COVER ──
@@ -546,8 +546,10 @@ Return ONLY this JSON (fill all FILL values with specific professional content):
       doc.setTextColor(255,255,255);doc.setFontSize(7.5);doc.setFont('helvetica','bold');
       doc.text('PLUGIN RECOMMENDATIONS',M+5,y+5.8);y+=12;
       r.wordpressSpecific.recommendations.forEach(rec=>{
-        const lines=wt(`${rec.action} — ${rec.impact}`,CW-30,7.5);
-        const bh=Math.max(12,6+lines.length*5);cy(bh+3);
+        const lines=wt(`${rec.action} — ${rec.impact}`,CW-26,7.5);
+        const pluginLine=cl(rec.plugin||'');
+        const hasPlugin=pluginLine.length>0;
+        const bh=Math.max(14,6+lines.length*5+(hasPlugin?7:0));cy(bh+3);
         const[pr,pg,pb]=rec.priority==='high'?[220,38,38]:rec.priority==='medium'?[217,119,6]:[22,163,74];
         doc.setFillColor(248,250,252);doc.roundedRect(M,y,CW,bh,1,1,'F');
         doc.setFillColor(pr,pg,pb);doc.roundedRect(M+4,y+3,14,6,1,1,'F');
@@ -555,7 +557,11 @@ Return ONLY this JSON (fill all FILL values with specific professional content):
         doc.text(rec.priority.toUpperCase(),M+11,y+7.3,{align:'center'});
         doc.setTextColor(17,24,39);doc.setFontSize(7.5);doc.setFont('helvetica','normal');
         lines.forEach((l,i)=>doc.text(l,M+22,y+7+i*5));
-        doc.setTextColor(22,163,74);doc.setFontSize(7);doc.text(cl(rec.plugin||''),W-M-2,y+7,{align:'right'});
+        if(hasPlugin){
+          const plugY=y+7+lines.length*5+1;
+          doc.setTextColor(22,163,74);doc.setFontSize(6.5);doc.setFont('helvetica','bold');
+          doc.text(pluginLine.substring(0,80),M+22,plugY);
+        }
         y+=bh+3;
       });y+=6;
     }
@@ -596,7 +602,7 @@ Return ONLY this JSON (fill all FILL values with specific professional content):
     });
 
     const total=(doc as unknown as{internal:{getNumberOfPages:()=>number}}).internal.getNumberOfPages();
-    for(let p=1;p<=total;p++){doc.setPage(p);addFooter();}
+    for(let p=1;p<=total;p++){doc.setPage(p);addFooter(p,total);}
     doc.save(`wordpress-audit-${cl(r.url).replace(/https?:\/\//,'').replace(/[^a-z0-9]/gi,'-').toLowerCase()}.pdf`);
   }
 
